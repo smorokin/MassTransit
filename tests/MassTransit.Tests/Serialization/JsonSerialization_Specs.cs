@@ -443,6 +443,7 @@ namespace MassTransit.Tests.Serialization
     [TestFixture(typeof(NewtonsoftJsonMessageSerializer))]
     [TestFixture(typeof(BsonMessageSerializer))]
     [TestFixture(typeof(NewtonsoftXmlMessageSerializer))]
+    [TestFixture(typeof(SystemTextJsonMessageSerializer))]
     public class Using_JsonConverterAttribute_on_a_property :
         SerializationTest
     {
@@ -467,6 +468,27 @@ namespace MassTransit.Tests.Serialization
         }
 
 
+        [Test]
+        public void Should_use_converter_for_deserialization_of_interface()
+        {
+            SimpleMessageInterface obj = new SimpleMessageWithoutConverters { ValueB = "Joe", ValueA = "" };
+
+            var result = SerializeAndReturn<SimpleMessageInterface>(obj);
+
+            result.ValueB.ShouldBe("Monster");
+        }
+
+        [Test]
+        public void Should_use_converter_for_serialization_of_interface()
+        {
+            SimpleMessageInterface obj = new SimpleMessageWithoutConverters { ValueA = "Joe", ValueB = "" };
+
+            var result = SerializeAndReturn<SimpleMessageInterface>(obj);
+
+            result.ValueA.ShouldBe("Monster");
+        }
+
+
         public class ModifyWhenSerializingConverter : JsonConverter
         {
             public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
@@ -482,6 +504,19 @@ namespace MassTransit.Tests.Serialization
             public override bool CanConvert(Type objectType)
             {
                 return typeof(string).GetTypeInfo().IsAssignableFrom(objectType);
+            }
+        }
+
+        public class ModifyWhenSerializingConverterSystem : System.Text.Json.Serialization.JsonConverter<string>
+        {
+            public override void Write(System.Text.Json.Utf8JsonWriter writer, string value, System.Text.Json.JsonSerializerOptions options)
+            {
+                writer.WriteStringValue("Monster");
+            }
+
+            public override string Read(ref System.Text.Json.Utf8JsonReader reader, Type typeToConvert, System.Text.Json.JsonSerializerOptions options)
+            {
+                return reader.GetString();
             }
         }
 
@@ -504,12 +539,45 @@ namespace MassTransit.Tests.Serialization
             }
         }
 
+        public class ModifyWhenDeserializingConverterSystem : System.Text.Json.Serialization.JsonConverter<string>
+        {
+            public override void Write(System.Text.Json.Utf8JsonWriter writer, string value, System.Text.Json.JsonSerializerOptions options)
+            {
+                writer.WriteStringValue(value);
+            }
+
+            public override string Read(ref System.Text.Json.Utf8JsonReader reader, Type typeToConvert, System.Text.Json.JsonSerializerOptions options)
+            {
+                return "Monster";
+            }
+        }
+
 
         public class SimpleMessage
         {
+            [System.Text.Json.Serialization.JsonConverter(typeof(ModifyWhenSerializingConverterSystem))]
             [JsonConverter(typeof(ModifyWhenSerializingConverter))]
             public string ValueA { get; set; }
 
+            [System.Text.Json.Serialization.JsonConverter(typeof(ModifyWhenDeserializingConverterSystem))]
+            [JsonConverter(typeof(ModifyWhenDeserializingConverter))]
+            public string ValueB { get; set; }
+        }
+
+
+        public class SimpleMessageWithoutConverters : SimpleMessageInterface
+        {
+            public string ValueA { get; set; }
+            public string ValueB { get; set; }
+        }
+
+        public interface SimpleMessageInterface
+        {
+            [System.Text.Json.Serialization.JsonConverter(typeof(ModifyWhenSerializingConverterSystem))]
+            [JsonConverter(typeof(ModifyWhenSerializingConverter))]
+            public string ValueA { get; set; }
+
+            [System.Text.Json.Serialization.JsonConverter(typeof(ModifyWhenDeserializingConverterSystem))]
             [JsonConverter(typeof(ModifyWhenDeserializingConverter))]
             public string ValueB { get; set; }
         }

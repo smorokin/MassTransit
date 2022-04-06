@@ -5,6 +5,7 @@
     using System.Collections.Generic;
     using System.Reflection;
     using System.Reflection.Emit;
+    using System.Text.Json.Serialization;
 
 
     public class DynamicImplementationBuilder :
@@ -64,6 +65,14 @@
 
                     var propertyBuilder = typeBuilder.DefineProperty(property.Name,
                         property.Attributes | PropertyAttributes.HasDefault, property.PropertyType, null);
+
+                    var jsonConverterAttribute = property.GetCustomAttribute<JsonConverterAttribute>();
+                    if (jsonConverterAttribute != null && jsonConverterAttribute.ConverterType != null)
+                    {
+                        var constructorInfo = typeof(JsonConverterAttribute).GetConstructor(new Type[] { typeof(Type) });
+                        var customAttributeBuilder = new CustomAttributeBuilder(constructorInfo, new[] { jsonConverterAttribute.ConverterType });
+                        propertyBuilder.SetCustomAttribute(customAttributeBuilder);
+                    }
 
                     var getMethod = GetGetMethodBuilder(property, typeBuilder, fieldBuilder);
                     var setMethod = GetSetMethodBuilder(property, typeBuilder, fieldBuilder);
